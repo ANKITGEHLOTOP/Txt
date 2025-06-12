@@ -15,8 +15,7 @@ from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 # Telegram API credentials - Set these as environment variables or replace directly here
 API_ID = int(os.getenv("API_ID", "29905645"))        # Replace with your API_ID
 API_HASH = os.getenv("API_HASH", "e5a701f6e0b5fb659cb57a230b9a3feb")  # Replace with your API_HASH
-BOT_TOKEN = os.getenv("BOT_TOKEN", "7938240034:AAHzPr4fzIEmDIH5c9UJz2bC9bhbvR5SZtg
-")  # Replace with your bot token
+BOT_TOKEN = os.getenv("BOT_TOKEN", "7938240034:AAHzPr4fzIEmDIH5c9UJz2bC9bhbvR5SZtg")  # Replace with your bot token
 
 # Classplus token or other API tokens if needed
 CLASSPLUS_TOKEN = os.getenv("CLASSPLUS_TOKEN", "eyJjb3Vyc2VJZCI6IjQ1NjY4NyIsInR1dG9ySWQiOm51bGwsIm9yZ0lkIjo0ODA2MTksImNhdGVnb3J5SWQiOm51bGx9r")
