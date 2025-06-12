@@ -1,253 +1,202 @@
 import os
+import re
 import sys
-import time
+import m3u8
 import json
-import logging
+import time
+import pytz
+import asyncio
 import requests
 import subprocess
+import urllib
+import urllib.parse
+import yt_dlp
+import tgcrypto
+import cloudscraper
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import unpad
+from base64 import b64encode, b64decode
+from logs import logging
+from bs4 import BeautifulSoup
+import saini as helper
+from utils import progress_bar
+from vars import API_ID, API_HASH, BOT_TOKEN, OWNER, CREDIT, AUTH_USERS
+from aiohttp import ClientSession
+from subprocess import getstatusoutput
+from pytube import YouTube
+from aiohttp import web
+import random
+from pyromod import listen
 from pyrogram import Client, filters
-from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.types import Message
+from pyrogram.errors import FloodWait
+from pyrogram.errors.exceptions.bad_request_400 import StickerEmojiInvalid
+from pyrogram.types.messages_and_media import message
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+import aiohttp
+import aiofiles
+import zipfile
+import shutil
+import ffmpeg
 
-# ---------------------------- #
-# Configuration & Constants
-# ---------------------------- #
-
-# Telegram API credentials - Set these as environment variables or replace directly here
-API_ID = int(os.getenv("API_ID", "29905645"))        # Replace with your API_ID
-API_HASH = os.getenv("API_HASH", "e5a701f6e0b5fb659cb57a230b9a3feb")  # Replace with your API_HASH
-BOT_TOKEN = os.getenv("BOT_TOKEN", "7938240034:AAHzPr4fzIEmDIH5c9UJz2bC9bhbvR5SZtg")  # Replace with your bot token
-
-# Classplus token or other API tokens if needed
-CLASSPLUS_TOKEN = os.getenv("CLASSPLUS_TOKEN", "eyJjb3Vyc2VJZCI6IjQ1NjY4NyIsInR1dG9ySWQiOm51bGwsIm9yZ0lkIjo0ODA2MTksImNhdGVnb3J5SWQiOm51bGx9r")
-
-# Logger setup
-logging.basicConfig(
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
-
-# Inline Keyboard Buttons
-CONTACT_BUTTON = InlineKeyboardMarkup(
-    [[InlineKeyboardButton("📞 Contact", url="https://t.me/SHINING_STAR_OP")]]
-)
-HELP_REPO_BUTTON = InlineKeyboardMarkup(
-    [[
-        InlineKeyboardButton("🛠️ Help", url="https://t.me/SHINING_STAR_OP"),
-        InlineKeyboardButton("🛠️ Repo", url="https://t.me/SHINING_STAR_OP")
-    ]]
+# Initialize the bot
+bot = Client(
+    "bot",
+    api_id=API_ID,
+    api_hash=API_HASH,
+    bot_token=BOT_TOKEN
 )
 
+cookies_file_path = os.getenv("cookies_file_path", "youtube_cookies.txt")
+api_url = "http://master-api-v3.vercel.app/"
+api_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNzkxOTMzNDE5NSIsInRnX3VzZXJuYW1lIjoi4p61IFtvZmZsaW5lXSIsImlhdCI6MTczODY5MjA3N30.SXzZ1MZcvMp5sGESj0hBKSghhxJ3k1GTWoBUbivUe1I"
+token_cp ='eyJjb3Vyc2VJZCI6IjQ1NjY4NyIsInR1dG9ySWQiOm51bGwsIm9yZ0lkIjo0ODA2MTksImNhdGVnb3J5SWQiOm51bGx9r'
+adda_token = "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJkcGthNTQ3MEBnbWFpbC5jb20iLCJhdWQiOiIxNzg2OTYwNSIsImlhdCI6MTc0NDk0NDQ2NCwiaXNzIjoiYWRkYTI0Ny5jb20iLCJuYW1lIjoiZHBrYSIsImVtYWlsIjoiZHBrYTU0NzBAZ21haWwuY29tIiwicGhvbmUiOiI3MzUyNDA0MTc2IiwidXNlcklkIjoiYWRkYS52MS41NzMyNmRmODVkZDkxZDRiNDkxN2FiZDExN2IwN2ZjOCIsImxvZ2luQXBpVmVyc2lvbiI6MX0.0QOuYFMkCEdVmwMVIPeETa6Kxr70zEslWOIAfC_ylhbku76nDcaBoNVvqN4HivWNwlyT0jkUKjWxZ8AbdorMLg"
+photologo = 'https://tinypic.host/images/2025/02/07/DeWatermark.ai_1738952933236-1.png'
+photoyt = 'https://tinypic.host/images/2025/03/18/YouTube-Logo.wine.png'
+photocp = 'https://tinypic.host/images/2025/03/28/IMG_20250328_133126.jpg'
+photozip = 'https://envs.sh/cD_.jpg'
 
-# ---------------------------- #
-# Helper Functions
-# ---------------------------- #
+# Inline keyboard for start command
+BUTTONSCONTACT = InlineKeyboardMarkup([[InlineKeyboardButton(text="📞 Contact", url="https://t.me/SHINING_STAR_OP")]])
+keyboard = InlineKeyboardMarkup(
+    [
+        [
+            InlineKeyboardButton(text="🛠️ Help", url="https://t.me/SHINING_STAR_OP"),
+            InlineKeyboardButton(text="🛠️ Repo", url="https://T.ME/SHINING_STAR_OP"),
+        ],
+    ]
+)
 
-def get_classplus_drm_url_and_keys(url, max_retries=3):
-    """
-    Try multiple APIs/endpoints to get the actual playable URL and keys needed to download DRM-protected content.
-    Returns tuple (playable_url, keys_dict or None)
-    """
+# Image URLs for the random image feature
+image_urls = [
+    "https://tinypic.host/images/2025/02/07/IMG_20250207_224444_975.jpg",
+    "https://tinypic.host/images/2025/02/07/DeWatermark.ai_1738952933236-1.png",
+]
+
+# --- FIXED CLASS PLUS DRM HANDLING ---
+def get_classplus_drm_content(url):
+    """Handle Classplus DRM content with multiple fallback methods"""
     try:
-        headers = {
-            'x-access-token': CLASSPLUS_TOKEN,
-            'User-Agent': 'Mobile-Android',
-            'app-version': '1.4.37.1',
-            'api-version': '18',
-            'device-id': '5d0d17ac8b3c9f51'
-        }
-
-        fallback_endpoints = [
-            f'https://api.classplusapp.com/cams/uploader/video/jw-signed-url?url={url}',
-            f'https://classplus-dl.vercel.app/api?url={url}',
-            f'https://dragoapi.vercel.app/classplus?link={url}',
-        ]
-
-        for retry in range(max_retries):
-            for api_url in fallback_endpoints:
-                try:
-                    logger.info(f"Trying DRM API: {api_url}")
-                    resp = requests.get(api_url, headers=headers if 'classplusapp' in api_url else {})
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        # Try to parse different response structures
-                        playable_url = data.get("url") or data.get("mpd_url") or url
-                        keys = data.get("keys")  # Can be None
-                        logger.info(f"Received playable URL: {playable_url}")
-                        return playable_url, keys
-                    else:
-                        logger.warning(f"DRM API {api_url} returned status {resp.status_code}")
-                except Exception as e:
-                    logger.error(f"Error connecting to DRM API {api_url}: {str(e)}")
-            time.sleep(2)
-        logger.error("All DRM API attempts failed")
-    except Exception as err:
-        logger.error(f"Exception in get_classplus_drm_url_and_keys: {err}")
-
-    # Fallback: return original URL with no keys
+        # Method 1: Direct API call
+        headers = {'x-access-token': token_cp, "X-CDN-Tag": "empty"}
+        api_url = f'https://api.classplusapp.com/cams/uploader/video/jw-signed-url?url={url}'
+        response = requests.get(api_url, headers=headers)
+        
+        if response.status_code == 200:
+            return response.json()['url'], None
+        
+        # Method 2: Alternative API endpoint
+        alt_api = f'https://classplus-dl.vercel.app/api?url={url}'
+        alt_response = requests.get(alt_api)
+        
+        if alt_response.status_code == 200:
+            data = alt_response.json()
+            return data.get('mpd_url'), data.get('keys')
+            
+    except Exception as e:
+        logging.error(f"Classplus DRM error: {str(e)}")
+    
     return url, None
 
+# --- MODIFIED DRM HANDLER ---
+@bot.on_message(filters.command(["drm"]) )
+async def txt_handler(bot: Client, m: Message):  
+    # ... [previous code until DRM handling] ...
 
-def download_with_yt_dlp(url: str, output_file: str, quality: str = "720", drm_keys: dict = None) -> bool:
-    """
-    Downloads the video via yt-dlp with optional DRM keys and quality restrictions.
-    Returns True if download succeeded, False otherwise.
-    """
+    try:    
+        with open(x, "r") as f:
+            content = f.read()
+        content = content.split("\n")
+        
+        links = []
+        for i in content:
+            if "://" in i:
+                url = i.split("://", 1)[1]
+                links.append(i.split("://", 1))
+                # ... [file type counting] ...
+        os.remove(x)
+    except:
+        # ... [error handling] ...
+
+    # ... [user input collection] ...
+
     try:
-        ytdlp_cmd = [
-            "yt-dlp",
-            "--allow-unplayable-formats",  # for DRM content sometimes needed
-            "-f", f"best[height<={quality}]",
-            "-o", output_file,
-        ]
+        for i in range(arg-1, len(links)):
+            Vxy = links[i][1].replace("file/d/","uc?export=download&id=").replace("www.youtube-nocookie.com/embed", "youtu.be").replace("?modestbranding=1", "").replace("/view?usp=sharing","")
+            url = "https://" + Vxy
+            link0 = "https://" + Vxy
 
-        # If DRM keys exist, append external downloader args with decryption key(s)
-        if drm_keys:
-            # Example key format assumed here; adjust if API returns keys differently
-            key_str = ",".join(drm_keys.values()) if isinstance(drm_keys, dict) else drm_keys
-            # Note: yt-dlp supports --external-downloader-args for ffmpeg
-            ytdlp_cmd.extend([
-                "--external-downloader", "ffmpeg",
-                "--external-downloader-args", f"-decryption_key {key_str}"
-            ])
+            # ... [name processing] ...
 
-        ytdlp_cmd.append(url)
+            # === FIXED CLASS PLUS HANDLING ===
+            if "classplusapp.com/drm/" in url or "media-cdn.classplusapp.com/drm/" in url:
+                url, keys_data = get_classplus_drm_content(url)
+                if keys_data:
+                    keys_string = " ".join([f"--key {key}" for key in keys_data])
+                else:
+                    keys_string = ""
 
-        logger.info(f"Running yt-dlp command: {' '.join(ytdlp_cmd)}")
+            # ... [other platform handling] ...
 
-        # Execute and wait for completion
-        completed = subprocess.run(ytdlp_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-
-        if completed.returncode == 0:
-            logger.info(f"Download succeeded: {output_file}")
-            return True
-        else:
-            logger.error(f"yt-dlp failed with code {completed.returncode}:\n{completed.stderr}")
-            return False
-
-    except Exception as e:
-        logger.error(f"Exception in download_with_yt_dlp: {e}")
-        return False
-
-
-# ---------------------------- #
-# Bot Commands and Handlers
-# ---------------------------- #
-
-app = Client("bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
-
-
-@app.on_message(filters.command("start"))
-async def start_handler(client: Client, message: Message):
-    await message.reply_text(
-        "Hello! I am your DRM-capable downloader bot.\n"
-        "Send /help to know more.",
-        reply_markup=CONTACT_BUTTON
-    )
-
-
-@app.on_message(filters.command("help"))
-async def help_handler(client: Client, message: Message):
-    await message.reply_text(
-        "Usage:\n"
-        "/drm - Send a text file containing one or more Classplus or other links to download DRM-protected or regular videos.\n"
-        "You'll be asked to provide preferred video quality.\n\n"
-        "Support and Repo links:",
-        reply_markup=HELP_REPO_BUTTON
-    )
-
-
-@app.on_message(filters.command("drm"))
-async def drm_download_handler(client: Client, message: Message):
-    """
-    Expects user to send a text file with video links. For each link:
-    - Detects if it's Classplus DRM protected content.
-    - Fetches proper playable URL and DRM keys if possible.
-    - Downloads using yt-dlp with optional DRM key usage.
-    """
-    try:
-        await message.reply_text("Please upload your text file containing video links (one link per line).")
-        input_file_msg: Message = await client.listen(message.chat.id, timeout=120)
-
-        if not input_file_msg.document:
-            await message.reply_text("You did not send a valid document file. Please try again.")
-            return
-
-        # Download user uploaded file locally
-        file_path = await input_file_msg.download()
-        logger.info(f"Downloaded user file: {file_path}")
-
-        # Read links from file
-        with open(file_path, "r", encoding="utf-8") as f:
-            links = [line.strip() for line in f if line.strip()]
-
-        os.remove(file_path)
-
-        if not links:
-            await message.reply_text("File is empty or no valid links found!")
-            return
-
-        # Ask user for preferred quality
-        quality_msg = await message.reply_text(
-            "Please send preferred download quality (e.g. 360, 480, 720, 1080). Default is 720."
-        )
-        try:
-            quality_resp: Message = await client.listen(message.chat.id, timeout=30)
-            quality = quality_resp.text if quality_resp.text.isdigit() else "720"
-        except Exception:
-            quality = "720"
-
-        await quality_msg.delete()
-
-        for link in links:
-            # Basic sanity check
-            if not (link.startswith("http://") or link.startswith("https://")):
-                await message.reply_text(f"Skipping invalid URL: {link}")
+            # === MODIFIED DOWNLOAD LOGIC ===
+            if 'drmcdni' in url or 'drm/wv' in url or ("classplusapp.com" in url and keys_string):
+                Show = f"<i><b>Video Downloading</b></i>\n<blockquote><b>{str(count).zfill(3)}) {name1}</b></blockquote>"
+                prog = await bot.send_message(channel_id, Show, disable_web_page_preview=True)
+                res_file = await helper.decrypt_and_merge_video(url, keys_string, path, name, raw_text2)
+                filename = res_file
+                await prog.delete(True)
+                await helper.send_vid(bot, m, cc, filename, thumb, name, prog, channel_id)
+                count += 1
+                await asyncio.sleep(1)
                 continue
 
-            await message.reply_text(f"Processing link: {link}")
-
-            # Detect Classplus links for DRM processing
-            if "classplusapp.com/drm" in link or "media-cdn.classplusapp.com" in link:
-                playable_url, drm_keys = get_classplus_drm_url_and_keys(link)
-
-                output_filename = f"output_{int(time.time())}.mp4"
-                success = download_with_yt_dlp(playable_url, output_filename, quality, drm_keys)
-
-                if success and os.path.exists(output_filename):
-                    # Send the video file
-                    await client.send_document(message.chat.id, output_filename, caption=f"Downloaded: {link}")
-                    os.remove(output_filename)
-                else:
-                    await message.reply_text(f"Failed to download DRM video: {link}")
-            else:
-                # Non-DRM normal yt-dlp download
-                output_filename = f"output_{int(time.time())}.mp4"
-                success = download_with_yt_dlp(link, output_filename, quality)
-
-                if success and os.path.exists(output_filename):
-                    await client.send_document(message.chat.id, output_filename, caption=f"Downloaded: {link}")
-                    os.remove(output_filename)
-                else:
-                    await message.reply_text(f"Failed to download video: {link}")
+            # ... [other download methods] ...
 
     except Exception as e:
-        logger.error(f"Exception in drm_download_handler: {e}")
-        await message.reply_text(f"An error occurred: {e}")
+        # ... [error handling] ...
 
+    # ... [completion message] ...
 
-@app.on_message(filters.command("ping"))
-async def ping_handler(client: Client, message: Message):
-    await message.reply_text("Pong!")
+# --- MODIFIED TEXT HANDLER ---
+@bot.on_message(filters.text & filters.private)
+async def text_handler(bot: Client, m: Message):
+    # ... [previous code] ...
 
+    try:
+            Vxy = link.replace("file/d/","uc?export=download&id=").replace("www.youtube-nocookie.com/embed", "youtu.be").replace("?modestbranding=1", "").replace("/view?usp=sharing","")
+            url = Vxy
 
-# ---------------------------- #
-# Run Bot
-# ---------------------------- #
-if __name__ == "__main__":
-    if not all([API_ID, API_HASH, BOT_TOKEN]):
-        logger.error("Please set API_ID, API_HASH and BOT_TOKEN environment variables correctly!")
-        sys.exit(1)
+            # ... [name processing] ...
 
-    logger.info("Starting bot...")
-    app.run()
+            # === FIXED CLASS PLUS HANDLING ===
+            if "classplusapp.com/drm/" in url or "media-cdn.classplusapp.com/drm/" in url:
+                url, keys_data = get_classplus_drm_content(url)
+                if keys_data:
+                    keys_string = " ".join([f"--key {key}" for key in keys_data])
+                else:
+                    keys_string = ""
+
+            # ... [other platform handling] ...
+
+            # === MODIFIED DOWNLOAD LOGIC ===
+            if 'drmcdni' in url or 'drm/wv' in url or ("classplusapp.com" in url and keys_string):
+                Show = f"**⚡Dᴏᴡɴʟᴏᴀᴅɪɴɢ Sᴛᴀʀᴛᴇᴅ...⏳**\n" \
+                       f"🔗𝐋𝐢𝐧𝐤 » {url}\n" \
+                       f"✦𝐁𝐨𝐭 𝐌𝐚𝐝𝐞 𝐁𝐲 ✦ {CREDIT}"
+                prog = await m.reply_text(Show, disable_web_page_preview=True)
+                res_file = await helper.decrypt_and_merge_video(url, keys_string, path, name, raw_text2)
+                filename = res_file
+                await prog.delete(True)
+                await helper.send_vid(bot, m, cc, filename, thumb, name, prog, channel_id)
+                await asyncio.sleep(1)
+                pass
+
+            # ... [other download methods] ...
+
+    except Exception as e:
+        # ... [error handling] ...
+
+# ... [rest of the bot code] ...
+
+bot.run()
