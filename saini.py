@@ -273,44 +273,52 @@ async def send_doc(bot: Client, m: Message, cc, filename, cc1, prog, count, name
         await asyncio.sleep(3)
 
 async def send_vid(bot: Client, m: Message, cc, filename, thumb, name, prog, channel_id):
-    # Generate thumbnail
-    subprocess.run(
-        f'ffmpeg -i "{filename}" -ss 00:00:10 -vframes 1 "{filename}.jpg"', 
-        shell=True
-    )
-    await prog.delete()
-    
-    reply = await m.reply_text(f"<blockquote><b>Generate Thumbnail:</b></blockquote>\n{name}")
-    
     try:
-        thumbnail = f"{filename}.jpg" if thumb == "/d" else thumb
-        dur = int(duration(filename))
-        start_time = time.time()
-
+        # Generate thumbnail
+        subprocess.run(
+            f'ffmpeg -i "{filename}" -ss 00:00:10 -vframes 1 "{filename}.jpg"',
+            shell=True
+        )
+        await prog.delete(True)
+        
+        reply = await m.reply_text(f"<blockquote><b>Generate Thumbnail:</b></blockquote>\n{name}")
+        
         try:
-            await bot.send_video(
-                channel_id,
-                filename,
-                caption=cc,
-                supports_streaming=True,
-                height=720,
-                width=1280,
-                thumb=thumbnail,
-                duration=dur,
-                progress=progress_bar,
-                progress_args=(reply, start_time)
+            thumbnail = f"{filename}.jpg" if thumb == "/d" else thumb
+            dur = int(duration(filename))
+            start_time = time.time()
+
+            try:
+                await bot.send_video(
+                    channel_id,
+                    filename,
+                    caption=cc,
+                    supports_streaming=True,
+                    height=720,
+                    width=1280,
+                    thumb=thumbnail,
+                    duration=dur,
+                    progress=progress_bar,
+                    progress_args=(reply, start_time)
+                )
+            except Exception as video_error:
+                print(f"Video send failed, trying document: {video_error}")
+                await bot.send_document(
+                    channel_id,
+                    filename,
+                    caption=cc,
+                    progress=progress_bar,
+                    progress_args=(reply, start_time)
+                )
         except Exception as e:
-            await bot.send_document(
-                channel_id,
-                filename,
-                caption=cc,
-                progress=progress_bar,
-                progress_args=(reply, start_time))
-    except Exception as e:
-        await m.reply_text(f"Error: {str(e)}")
-    finally:
-        if os.path.exists(filename):
-            os.remove(filename)
-        if os.path.exists(f"{filename}.jpg"):
-            os.remove(f"{filename}.jpg")
-        await reply.delete()
+            await m.reply_text(f"Error during sending: {str(e)}")
+            raise
+        finally:
+            if os.path.exists(filename):
+                os.remove(filename)
+            if os.path.exists(f"{filename}.jpg"):
+                os.remove(f"{filename}.jpg")
+            await reply.delete(True)
+    except Exception as main_error:
+        await m.reply_text(f"Major error in send_vid: {str(main_error)}")
+        raise
