@@ -299,7 +299,7 @@ async def send_vid(bot: Client, m: Message, cc, filename, thumb, name, prog, cha
                 duration=dur,
                 progress=progress_bar,
                 progress_args=(reply, start_time)
-        except Exception:
+        except Exception as e:
             await bot.send_document(
                 channel_id,
                 filename,
