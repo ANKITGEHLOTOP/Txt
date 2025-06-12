@@ -298,10 +298,10 @@ async def send_vid(bot: Client, m: Message, cc, filename, thumb, name, prog, cha
     response = await m.reply_text(f"<blockquote><b>Generate Thumbnail:</b></blockquote>\n{name}")
 reply = await response  # if response itself is awaitable
     try:
-        if thumb == "/d":
-            thumbnail = f"{filename}.jpg"
-        else:
-            thumbnail = thumb
+    if thumb == "/d":
+        thumbnail = f"{filename}.jpg"
+    else:
+        thumbnail = thumb
             
     except Exception as e:
         await m.reply_text(str(e))
